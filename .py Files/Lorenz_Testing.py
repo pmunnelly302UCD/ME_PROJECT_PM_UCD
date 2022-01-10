@@ -21,19 +21,18 @@ import statsmodels.graphics.tsaplots as sgt
 
 np.random.seed(100) # Consistency
 #############################################
-#############################################
 # TRAINING/TEST PARAMATER CHOICE:
-# Define some script data parameters:
+#############################################
 TIMESTEP = 0.001 # Training data timestep
 TIME_1 = np.arange(0,10,TIMESTEP) # First training trajectory time vector 
-TIME_2 = np.arange(100,110,TIMESTEP) # Second training trajectory time vector
+TIME_2 = np.arange(0,10,TIMESTEP) # Second training trajectory time vector
 TIME_TEST = np.arange(0,15,TIMESTEP) # Testing data time vector
 
 X0_1 = [1, -1, 1] # Initial conditions for first training trajectory
 X0_2 = [-3, 3, -3] # Initial conditions for second training trajectory
 X0_TEST = [8, 7, 15] # Initial conditions for testing data
 
-NOISE_LEVEL = 0 # Amplitude of white noise to be added to training data
+NOISE_LEVEL = 0.1 # Amplitude of white noise to be added to training data
 THRESHOLD = 0.1 # threshold for stlsq optimiser
 #############################################
 #############################################
