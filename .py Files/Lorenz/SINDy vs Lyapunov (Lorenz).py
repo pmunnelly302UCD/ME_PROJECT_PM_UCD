@@ -41,7 +41,9 @@ x0_train = [-8, 8, 27]  # Initial Conditions
 t_test = np.arange(0, 50, dt)  # Longer time range
 x0_test = X0 #np.array([8, 7, 15])  # New initial conditions
 
+# Define arrarys to hold model divergence time and R^2 score
 diverge_time = np.full((s_omega.size, s_Lambda.size), t_test[-1]) 
+R_sqr = np.zeros((s_omega.size, s_Lambda.size)) 
 
 ##############################################################################
 # Define Lorenz system:
@@ -150,9 +152,13 @@ for i_omega in range(s_omega.size):
             model = ps.SINDy()
             model.fit(x_train, t=dt)
             
+            
             # Create test trajectory from real system:
             sol = solve_ivp(lorenz, (t_test[0], t_test[-1]), x0_test, t_eval=t_test) # Integrate to produce x(t),y(t),z(t)
             x_test = np.transpose(sol.y) 
+            
+            # Calculate coefficient of determination R^2
+            R_sqr[i_omega,i_Lambda] = model.score(x_test, t =dt) 
             
             # Create SINDy predicted trajectory:
             x_test_sim = model.simulate(x0_test, t_test)
@@ -166,8 +172,9 @@ for i_omega in range(s_omega.size):
         #    MLE[i_omega,i_Lambda] = 0
         
 
-#%%
+#%% Plotting
 
+# For Lyapunov Exponent:
 fig, ax = plt.subplots(figsize=(11, 9))
 ax = sns.heatmap(MLE, linewidth=0.5, xticklabels=np.around(s_Lambda, decimals=1), 
                  yticklabels=np.around(s_omega, decimals=1))
@@ -177,24 +184,35 @@ ax.set_title('MLE')
 #plt.savefig('Lorenz_MLE.png')
 plt.show()
 
+# For divergance time
 fig, ax = plt.subplots(figsize=(11, 9))
 ax = sns.heatmap(diverge_time, linewidth=0.5, xticklabels=np.around(s_Lambda, decimals=1), 
                  yticklabels=np.around(s_omega, decimals=1))
 ax.set_xlabel('$\\rho$')
 ax.set_ylabel('$\sigma$')
 ax.set_title('Divergance time')
-#plt.savefig('Lorenz_SINDy.png')
+plt.show()
+
+# For R_sqr
+fig, ax = plt.subplots(figsize=(11, 9))
+ax = sns.heatmap(R_sqr, linewidth=0.5, xticklabels=np.around(s_Lambda, decimals=1), 
+                 yticklabels=np.around(s_omega, decimals=1))
+ax.set_xlabel('$\\rho$')
+ax.set_ylabel('$\sigma$')
+ax.set_title('$R^2$')
 plt.show()
 
 # First convert 2D arrays to 1D arrays:
 MLE_sorted = MLE[0]
 diverge_time_sorted = diverge_time[0]
+R_sqr_sorted = R_sqr[0]
 
 ##############################################################
 # MLE VS SINDy divergance time
 for i in range(s_omega.size-1):
     MLE_sorted = np.append(MLE_sorted, MLE[i+1])
     diverge_time_sorted = np.append(diverge_time_sorted, diverge_time[i+1])
+    R_sqr_sorted =  np.append(R_sqr_sorted, R_sqr[i+1])
 
 # Now sort arrays from smallest to largest MLE(bubblesort):    
 for i in range(MLE_sorted.size-1, 0, -1):
@@ -202,17 +220,26 @@ for i in range(MLE_sorted.size-1, 0, -1):
         if (MLE_sorted[idx] > MLE_sorted[idx+1]):
             temp1 = MLE_sorted[idx]
             temp2 = diverge_time_sorted[idx]
+            temp3 = R_sqr_sorted[idx]
             
             MLE_sorted[idx] = MLE_sorted[idx+1]
             diverge_time_sorted[idx] = diverge_time_sorted[idx+1]
+            R_sqr_sorted[idx] = R_sqr_sorted[idx+1]
             
             MLE_sorted[idx+1] = temp1
             diverge_time_sorted[idx+1] = temp2
+            R_sqr_sorted[idx+1] = temp3
             
-# Plot result
+# Plot result MLE vs divergence time
 fig, axs = plt.subplots(figsize=(7, 9))
 
 axs.plot(MLE_sorted, diverge_time_sorted,'.')
 axs.set(xlabel='Maximum Lyapunov Exponant', ylabel='SINDy Prediction Horizon (sec)',
         title = 'Test over 50 seconds, X0 = [8,7,15]');
-#plt.savefig('Lorenz_MLE_VS_SINDy.png')
+
+# Plot result MLE vs R^2
+fig, axs = plt.subplots(figsize=(7, 9))
+
+axs.plot(MLE_sorted, R_sqr_sorted,'.')
+axs.set(xlabel='Maximum Lyapunov Exponant', ylabel='Coefficient of determination ($R^2$)',
+        title = 'Test over 50 seconds, X0 = [8,7,15]');

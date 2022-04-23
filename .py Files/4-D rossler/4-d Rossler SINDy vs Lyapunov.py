@@ -17,43 +17,40 @@ import matplotlib.pyplot as plt
 ##############################################################################
 # Define initial condition and paramater sweep range values:
     
-X0 = [0.25, 0.25, 0.25, 0.25]
+X0 = [-10,-6,0,10]
 
-s_omega = np.arange(0.25, 0.26, 0.02)
-s_Lambda = np.arange(0, 0.5, 0.005)
+s_omega = np.arange(3, 4, 0.05)
+s_Lambda = np.arange(0.3, 0.4, 0.005)
 
-#s_omega = np.concatenate((np.arange(1.28, 1.4, 0.01), np.arange(1.4, 1.8, 0.1)), axis=0)
-#s_Lambda = np.concatenate((np.arange(1.28, 1.4, 0.01), np.arange(1.4, 1.8, 0.1)), axis=0)
-
-#%%
-
-print(0.5*(X0[2]**2 + X0[3]**2) + 0.5*(s_Lambda**2 + X0[1]**2 + 2*((s_Lambda**2)*X0[1] - (2/3)*X0[1]**3)))
-
-#%%
+a = 0.25
+b = 3 
+c = 0.35 
+d = 0.05
 
 ##############################################################################
 # Set SINDy training and test paramaters:
 
 dt = 0.01 # Set timestep for integration
-t_train = np.arange(0, 7, dt)  # Time range to integrate over
+t_train = np.arange(0, 10, dt)  # Time range to integrate over
 x0_train = X0  # Initial Conditions
 
-t_test = np.arange(0, 150, dt)  # Longer time range
+t_test = np.arange(0, 50, dt)  # Longer time range
 x0_test = X0 #np.array([8, 7, 15])  # New initial conditions
 
-diverge_time = np.full((s_omega.size, s_Lambda.size), t_test[-1]) 
-R_sqr = np.zeros((s_omega.size, s_Lambda.size)) 
+R_sqr = np.zeros((s_omega.size, s_Lambda.size))
+
+sparse_regression_optimizer = ps.STLSQ(threshold=0.1)
 ##############################################################################
 # Define system:
 
-def Henon_Heiles(t, x):    
-        
+def Rossler(t, x):
     return [
-        x[2],  # d(q_1)/dt
-        x[3],  # d(q_2)/dt
-        -x[0] -2*x[0]*x[1],  # d(p_1)/dt
-        -x[1] -x[0]**2 +x[1]**2  # d(p_2)/dt
+        -x[1] -x[2],
+        x[0] +a*x[1] +x[3],
+        b +x[0]*x[2],
+        -c*x[2] +d*x[3]
     ]
+
 ##############################################################################
 # Define 2D array to hold maximum Lyapunov exponants:
     
@@ -61,26 +58,22 @@ MLE = np.zeros((s_omega.size, s_Lambda.size))
 
 ##############################################################################
 # Set Lyapunov algorithm paramaters:
-    
+
 epsilon = 0.01  # Pertibation Amplitude
 T = 5  # Integral time interval
-M = 50 # Integral iterations
+M = 100 # Integral iterations
 N = 4 # Number of state variables in our system
 dt = 0.01 # Set timestep for integration
+limit = 300 # limit for state variable magnitudes
 
 ##############################################################################
 
 for i_omega in range(s_omega.size):
-    
+    b = s_omega[i_omega]
     print (i_omega) # Monitor algorthim progession
-    
     for i_Lambda in range(s_Lambda.size):
-        
         print ('\t', i_Lambda) # Monitor algorthim progession
-        
-        X0 = [0.25, 0.25, 0.25, 0.25]
-        X0[1] = s_omega[i_omega]
-        X0[0] = s_Lambda[i_Lambda]
+        c = s_Lambda[i_Lambda]
     
         # Now run our Lyapunov algorithm:
 
@@ -113,13 +106,13 @@ for i_omega in range(s_omega.size):
     #try:    
         for i in range(M):
             # Integrate reference vector over time T:
-            sol = solve_ivp(Henon_Heiles, (i*T, (i+1)*T), x, method='BDF', t_eval=np.arange(i*T,(i+1)*T,dt))
+            sol = solve_ivp(Rossler, (i*T, (i+1)*T), x, method='BDF', t_eval=np.arange(i*T,(i+1)*T,dt))
             x = (np.transpose(sol.y))[-1]     
             
             for j in range(N):
                 # Integrate each perturbation vector over time T:
                 # x_tilda(j) = final value of integral from (x_tilda_0(j)) over T
-                sol = solve_ivp(Henon_Heiles, (i*T, (i+1)*T), x_tilda_0[j], method='BDF', t_eval=np.arange(i*T,(i+1)*T,dt))
+                sol = solve_ivp(Rossler, (i*T, (i+1)*T), x_tilda_0[j], method='BDF', t_eval=np.arange(i*T,(i+1)*T,dt))
                 x_tilda[j] = (np.transpose(sol.y))[-1]
                 
                 # Find the relative vector between each perturbation vector and the refernce vector:
@@ -148,75 +141,49 @@ for i_omega in range(s_omega.size):
         ##############################################################################
         # Create SINDy model and calculate divergance time with true system
         
-        x0_train = X0  # Initial Conditions
-        x0_test = X0 #np.array([8, 7, 15])  # New initial conditions
-        
         # First create SINDy model
-        sol = solve_ivp(Henon_Heiles, (t_train[0], t_train[-1]), x0_train, t_eval=t_train)  # Integrate to produce x(t),y(t),z(t)
+        sol = solve_ivp(Rossler, (t_train[0], t_train[-1]), x0_train, t_eval=t_train)  # Integrate to produce x(t),y(t),z(t)
         x_train = np.transpose(sol.y)  
-        model = ps.SINDy()
+        model = ps.SINDy(optimizer=sparse_regression_optimizer)
         model.fit(x_train, t=dt)
         
         # Create test trajectory from real system:
-        sol = solve_ivp(Henon_Heiles, (t_test[0], t_test[-1]), x0_test, t_eval=t_test) # Integrate to produce x(t),y(t),z(t)
+        sol = solve_ivp(Rossler, (t_test[0], t_test[-1]), x0_test, t_eval=t_test) # Integrate to produce x(t),y(t),z(t)
         x_test = np.transpose(sol.y) 
         
         R_sqr[i_omega,i_Lambda] = model.score(x_test, t =dt) 
-        if(R_sqr[i_omega,i_Lambda] < 0):
-            R_sqr[i_omega,i_Lambda] = 0
-        # Create SINDy predicted trajectory:
-        x_test_sim = model.simulate(x0_test, t_test)
-        
-        for i in range(t_test.size):
-            diff = np.linalg.norm(x_test[i]-x_test_sim[i])
-            if (diff > 0.25*np.linalg.norm(x_test[i])):
-                diverge_time[i_omega,i_Lambda] = t_test[i]
-                break
         
     #except:
         #MLE[i_omega,i_Lambda] = 0
         #diverge_time[i_omega,i_Lambda] = 0
 
+#%%
 
-#%% Plotting
-
-# For Lyapunov Exponent:
-fig, ax = plt.subplots(figsize=(11, 3))
-ax = sns.heatmap(MLE, linewidth=0.5, xticklabels=np.around(E, decimals=3), 
-                 yticklabels=np.around(s_omega, decimals=1))
-ax.set_xlabel('$X_0[0]$')
-ax.set_ylabel('')
-ax.set_title('MLE')
-plt.show()
-
-# For divergance time
-fig, ax = plt.subplots(figsize=(11, 3))
-ax = sns.heatmap(diverge_time, linewidth=0.5, xticklabels=np.around(E, decimals=3),
-                 yticklabels=np.around(s_omega, decimals=1))
-ax.set_xlabel('$X_0[0]$')
-ax.set_ylabel('')
-ax.set_title('Divergance time')
+fig, ax = plt.subplots(figsize=(11, 9))
+ax = sns.heatmap(MLE, linewidth=0.5, xticklabels=np.around(s_Lambda, decimals=3), 
+                 yticklabels=np.around(s_omega, decimals=3))
+ax.set_xlabel('c')
+ax.set_ylabel('b')
+ax.set_title('Maximum Lyapunov Exponant')
 plt.show()
 
 # For R_sqr
-fig, ax = plt.subplots(figsize=(11, 3))
-ax = sns.heatmap(R_sqr, linewidth=0.5, xticklabels=np.around(E, decimals=3), 
-                 yticklabels=np.around(s_omega, decimals=1))
-ax.set_xlabel('$X_0[0]$')
-ax.set_ylabel('')
+fig, ax = plt.subplots(figsize=(11, 9))
+ax = sns.heatmap(R_sqr, linewidth=0.5, xticklabels=np.around(s_Lambda, decimals=2), 
+                 yticklabels=np.around(s_omega, decimals=2))
+ax.set_xlabel('c')
+ax.set_ylabel('b')
 ax.set_title('$R^2$')
 plt.show()
 
 # First convert 2D arrays to 1D arrays:
 MLE_sorted = MLE[0]
-diverge_time_sorted = diverge_time[0]
 R_sqr_sorted = R_sqr[0]
 
 ##############################################################
 # MLE VS SINDy divergance time
 for i in range(s_omega.size-1):
     MLE_sorted = np.append(MLE_sorted, MLE[i+1])
-    diverge_time_sorted = np.append(diverge_time_sorted, diverge_time[i+1])
     R_sqr_sorted =  np.append(R_sqr_sorted, R_sqr[i+1])
 
 # Now sort arrays from smallest to largest MLE(bubblesort):    
@@ -224,28 +191,20 @@ for i in range(MLE_sorted.size-1, 0, -1):
     for idx in range(i):
         if (MLE_sorted[idx] > MLE_sorted[idx+1]):
             temp1 = MLE_sorted[idx]
-            temp2 = diverge_time_sorted[idx]
             temp3 = R_sqr_sorted[idx]
             
             MLE_sorted[idx] = MLE_sorted[idx+1]
-            diverge_time_sorted[idx] = diverge_time_sorted[idx+1]
             R_sqr_sorted[idx] = R_sqr_sorted[idx+1]
             
             MLE_sorted[idx+1] = temp1
-            diverge_time_sorted[idx+1] = temp2
             R_sqr_sorted[idx+1] = temp3
             
-# Plot result MLE vs divergence time
-fig, axs = plt.subplots(figsize=(7, 9))
 
-axs.plot(MLE_sorted, diverge_time_sorted,'.')
-axs.set(xlabel='Maximum Lyapunov Exponant', ylabel='SINDy Prediction Horizon (sec)',
-        title = 'Test over 50 seconds');
 
 # Plot result MLE vs R^2
 fig, axs = plt.subplots(figsize=(7, 9))
 
 axs.plot(MLE_sorted, R_sqr_sorted,'.')
 axs.set(xlabel='Maximum Lyapunov Exponant', ylabel='Coefficient of determination ($R^2$)',
-        title = 'Test over 50 seconds');
+        title = 'Test over 50 seconds, X0 = [-10,-6,0,10]');
 print(np.corrcoef(MLE_sorted, R_sqr_sorted))
