@@ -11,8 +11,6 @@ Author: Patrick Munnelly
 
 # Import packages:
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
-from mpl_toolkits.mplot3d import axes3d
 import numpy as np
 from numpy import sin,cos
 from scipy.integrate import solve_ivp
@@ -20,14 +18,14 @@ from scipy.integrate import solve_ivp
 
 ################################################################
 # Define time data and initial conditions:
-dt = 0.001
-t_test = np.arange(0,200,dt)
+dt = 0.01
+t_test = np.arange(0,2000,dt)
 X0 = [0.5, 0.5, 0.5, 0.5, 1]
 
 ################################################################
 # Define model system paramaters:
-omega = 1
-Lambda = 1
+omega = 0.5
+Lambda = 1.5
 
 ################################################################
 # Define our model system DEs:

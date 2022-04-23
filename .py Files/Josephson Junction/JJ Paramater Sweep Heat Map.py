@@ -18,14 +18,14 @@ from numpy import sin
 
 A0 = 0.5
 A1 = 0.5
-OMEGA0 = 1.7
+OMEGA0 = 0.5
 omega = 1
 beta = 0.01
     
-X0 = [0.5, 0.5]
+X0 = [1, 1]
 
-s_omega = np.arange(0.5, 2.5, 0.4)
-s_Lambda = np.arange(0, 0.5, 0.1)
+s_omega = np.arange(0.1, 1.7, 0.1)
+s_Lambda = np.arange(0.01, 0.25, 0.02)
 
 
 
@@ -47,10 +47,10 @@ MLE = np.zeros((s_omega.size, s_Lambda.size))
 ##############################################################################
 # Set Lyapunov algorithm paramaters:
 epsilon = 0.01  # Pertibation Amplitude
-T = 20  # Integral time interval
+T = 5  # Integral time interval
 M = 100 # Integral iterations
 N = 2 # Number of state variables in our system
-dt = 0.001 # Set timestep for integration
+dt = 0.01 # Set timestep for integration
 
 ##############################################################################
 
@@ -61,7 +61,7 @@ for i_omega in range(s_omega.size):
     
     for i_Lambda in range(s_Lambda.size):
         print ('\t', i_Lambda)
-        w2 = s_Lambda[i_Lambda]
+        beta = s_Lambda[i_Lambda]
     
         # Now run our Lyapunov algorithm:
 
