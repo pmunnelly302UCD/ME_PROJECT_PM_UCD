@@ -25,8 +25,8 @@ import pysindy as ps
     
 X0 = [8,7,15]
 
-s_omega = np.arange(7, 8, 0.05)
-s_Lambda = np.arange(20, 30, 0.5)
+s_sigma = np.arange(7, 8, 0.05)
+s_rho = np.arange(20, 30, 0.5)
 
 sigma = 10
 rho = 28
@@ -42,7 +42,7 @@ x0_train = [-8, 8, 27]  # Initial Conditions
 t_test = np.arange(0, 50, dt)  # Longer time range
 x0_test = X0 #np.array([8, 7, 15])  # New initial conditions
 
-diverge_time = np.full((s_omega.size, s_Lambda.size), t_test[-1]) 
+diverge_time = np.full((s_sigma.size, s_rho.size), t_test[-1]) 
 
 ##############################################################################
 # Define Lorenz system:
@@ -57,41 +57,41 @@ def lorenz(t, x):
 ##############################################################################
 # Define 2D array to hold maximum Lyapunov exponants:
 
-MLE = np.zeros((s_omega.size, s_Lambda.size)) 
+MLE = np.zeros((s_sigma.size, s_rho.size)) 
 
 ##############################################################################
 # Set Lyapunov algorithm paramaters:
 
 epsilon = 0.01  # Pertibation Amplitude
 T = 1  # Integral time interval
-M = 50 # Integral iterations
+M = 100 # Integral iterations
 N = 3 # Number of state variables in our system
 
 ##############################################################################
 # Begin paramater sweep:
 
-for i_omega in range(s_omega.size):
+for i_sigma in range(s_sigma.size):
     
-    print (i_omega) # Monitor algorthim progession
-    sigma = s_omega[i_omega]
+    print (i_sigma) # Monitor algorthim progession
+    sigma = s_sigma[i_sigma] # Set new parameter
 
-    for i_Lambda in range(s_Lambda.size):
+    for i_rho in range(s_rho.size):
         
-        print ('\t', i_Lambda) # Monitor algorthim progession
-        rho = s_Lambda[i_Lambda]
+        print ('\t', i_rho) # Monitor algorthim progession
+        rho = s_rho[i_rho] # Set new parameter
     
         # Now run our Lyapunov algorithm:
 
         # Reference vector:
         x = X0
 
-        # Perturbed vector:
+        # Perturbed vectors:
         x_tilda = np.zeros((N,N))
 
-        # Perturned vector relative to reference vector
+        # Perturned vector relative to reference vectors:
         x_tilda_r = np.zeros((N,N))
 
-        # Create initial Orthonormalised perturbed vector:
+        # Create initial Orthonormalised perturbed vectors:
         p = ([[epsilon, 0, 0],
               [0, epsilon, 0],
               [0, 0, epsilon]])
@@ -100,9 +100,10 @@ for i_omega in range(s_omega.size):
                      np.add(x,p[1]),
                      np.add(x,p[2])]
 
-
+        # to hold relative orthonormalised perturbed vectors:
         x_tilda_0_r = np.zeros((N,N))
 
+        # To hold running sum for exponent calculation:
         S = np.zeros(N)
 
         ##############################################################################
@@ -140,7 +141,7 @@ for i_omega in range(s_omega.size):
      
             L_exp = S/(M*T)
             
-            MLE[i_omega,i_Lambda] = np.max(L_exp)
+            MLE[i_sigma,i_rho] = np.max(L_exp)
             
             ##############################################################################
             # Create SINDy model and calculate divergance time with true system
@@ -161,17 +162,17 @@ for i_omega in range(s_omega.size):
             for i in range(t_test.size):
                 diff = np.linalg.norm(x_test[i]-x_test_sim[i])
                 if(diff > 0.25*np.linalg.norm(x_test[i])):
-                    diverge_time[i_omega,i_Lambda] = t_test[i]
+                    diverge_time[i_sigma,i_rho] = t_test[i]
                     break
        # except:
-        #    MLE[i_omega,i_Lambda] = 0
+        #    MLE[i_sigma,i_rho] = 0
         
 
-#%%
+#%% Plot heatmaps:
 
 fig, ax = plt.subplots(figsize=(11, 9))
-ax = sns.heatmap(MLE, linewidth=0.5, xticklabels=np.around(s_Lambda, decimals=1), 
-                 yticklabels=np.around(s_omega, decimals=1))
+ax = sns.heatmap(MLE, linewidth=0.5, xticklabels=np.around(s_rho, decimals=1), 
+                 yticklabels=np.around(s_sigma, decimals=1))
 ax.set_xlabel('rho')
 ax.set_ylabel('sigma')
 ax.set_title('MLE')
@@ -179,8 +180,8 @@ plt.savefig('Lorenz_MLE.png')
 plt.show()
 
 fig, ax = plt.subplots(figsize=(11, 9))
-ax = sns.heatmap(diverge_time, linewidth=0.5, xticklabels=np.around(s_Lambda, decimals=1), 
-                 yticklabels=np.around(s_omega, decimals=1))
+ax = sns.heatmap(diverge_time, linewidth=0.5, xticklabels=np.around(s_rho, decimals=1), 
+                 yticklabels=np.around(s_sigma, decimals=1))
 ax.set_xlabel('rho')
 ax.set_ylabel('sigma')
 ax.set_title('Divergance time')
@@ -193,7 +194,7 @@ diverge_time_sorted = diverge_time[0]
 
 ##############################################################
 # MLE VS SINDy divergance time
-for i in range(s_omega.size-1):
+for i in range(s_sigma.size-1):
     MLE_sorted = np.append(MLE_sorted, MLE[i+1])
     diverge_time_sorted = np.append(diverge_time_sorted, diverge_time[i+1])
 
@@ -210,10 +211,12 @@ for i in range(MLE_sorted.size-1, 0, -1):
             MLE_sorted[idx+1] = temp1
             diverge_time_sorted[idx+1] = temp2
             
-# Plot result
+            
+# Plot MLE vs SINDy divergence time:
 fig, axs = plt.subplots(figsize=(7, 9))
 
 axs.plot(MLE_sorted, diverge_time_sorted,'.')
 axs.set(xlabel='Maximum Lyapunov Exponant', ylabel='SINDy Prediction Horizon (sec)',
         title = 'Test over 50 seconds, X0 = [8,7,15]');
-plt.savefig('Lorenz_MLE_VS_SINDy.png');
+plt.show()
+#plt.savefig('Lorenz_MLE_VS_SINDy.png');
